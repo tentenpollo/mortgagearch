@@ -12,7 +12,7 @@ const TOKENS_CACHE_PREFIX = "broker:tokens:";
 const CLIENTS_CACHE_PREFIX = "broker:clients:";
 
 export async function POST(request: NextRequest) {
-  const authError = requireBrokerAuth(request);
+  const authError = await requireBrokerAuth(request);
   if (authError) return authError;
 
   try {

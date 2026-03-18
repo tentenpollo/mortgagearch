@@ -10,7 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authError = requireBrokerAuth(request);
+  const authError = await requireBrokerAuth(request);
   if (authError) return authError;
 
   try {
@@ -24,7 +24,7 @@ export async function GET(
     }
 
     let ocrText: string | null = null;
-    const ocrTextPath = row.documents.ocrTextPath;
+    const ocrTextPath = row.document.ocrTextPath;
 
     if (typeof ocrTextPath === "string" && ocrTextPath.length > 0) {
       try {
@@ -41,18 +41,21 @@ export async function GET(
       }
     }
 
-    return NextResponse.json<ApiResponse>({
-      success: true,
-      data: {
-        ...row.documents,
-        client: row.clients,
-        ocrText,
+    return NextResponse.json<ApiResponse>(
+      {
+        success: true,
+        data: {
+          ...row.document,
+          client: row.client,
+          ocrText,
+        },
       },
-    }, {
-      headers: {
-        "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
-      },
-    });
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+        },
+      }
+    );
   } catch (error) {
     console.error("Get document error:", error);
     return NextResponse.json<ApiResponse>(
@@ -62,7 +65,6 @@ export async function GET(
   }
 }
 
-/** PATCH — used by the worker to update OCR/AI results */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

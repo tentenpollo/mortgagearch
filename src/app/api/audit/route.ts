@@ -6,7 +6,7 @@ import { desc, eq } from "drizzle-orm";
 import type { ApiResponse } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
-  const authError = requireBrokerAuth(request);
+  const authError = await requireBrokerAuth(request);
   if (authError) return authError;
 
   try {

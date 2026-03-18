@@ -1,17 +1,14 @@
-import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function requireBrokerAuth(request: NextRequest) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("broker_session")?.value;
-  
+export function requireBrokerAuth(request: NextRequest): NextResponse | null {
+  const token = request.cookies.get("broker_session")?.value;
+
   if (!token) {
-    throw new Error("Unauthorized");
+    return NextResponse.json(
+      { success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+      { status: 401 }
+    );
   }
-  
-  return { token };
-}
 
-export function getBrokerFromRequest(request: NextRequest) {
-  return { brokerId: "default" };
+  return null;
 }

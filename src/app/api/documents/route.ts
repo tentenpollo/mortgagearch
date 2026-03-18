@@ -4,25 +4,28 @@ import { documentService } from "@/lib/services/document.service";
 import type { ApiResponse } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
-  const authError = requireBrokerAuth(request);
+  const authError = await requireBrokerAuth(request);
   if (authError) return authError;
 
   try {
     const rows = await documentService.list();
 
     const data = rows.map((row) => ({
-      ...row.documents,
-      client: row.clients,
+      ...row.document,
+      client: row.client,
     }));
 
-    return NextResponse.json<ApiResponse>({
-      success: true,
-      data,
-    }, {
-      headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+    return NextResponse.json<ApiResponse>(
+      {
+        success: true,
+        data,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        },
+      }
+    );
   } catch (error) {
     console.error("List documents error:", error);
     return NextResponse.json<ApiResponse>(
