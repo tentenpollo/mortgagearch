@@ -2,6 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Validate environment variables exist
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error("[Middleware] Missing Supabase environment variables");
+    return NextResponse.next({ request });
+  }
+
   if (request.method === "POST" && request.nextUrl.pathname.startsWith("/api/")) {
     const origin = request.headers.get("origin");
     const host = request.headers.get("host");
@@ -37,10 +43,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh the session
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh the session (with error handling)
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (error) {
+    console.error("[Middleware] Auth failed:", error);
+    // Continue without user - route handlers will protect routes
+  }
 
   // Protect dashboard routes
   if (request.nextUrl.pathname.startsWith("/dashboard")) {
