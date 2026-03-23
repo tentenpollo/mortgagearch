@@ -2,31 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    @apply h-full bg-slate-100;
-  }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-  body {
-    @apply min-h-full bg-slate-100 text-slate-900 antialiased;
+@layer base {
+  :root {
+    --color-brand: 99 102 241;
+    --radius: 0.75rem;
   }
 
   * {
     @apply border-slate-200;
   }
+
+  body {
+    @apply bg-surface-50 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
 }
 
 @layer components {
   .page-container {
-    @apply mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8;
+    @apply mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8;
   }
 
-  .card-pad {
-    @apply p-5 sm:p-6;
+  /* Focus rings */
+  .focus-ring {
+    @apply outline-none ring-2 ring-brand-500/40 ring-offset-2 ring-offset-white;
   }
 
-  .input {
-    @apply h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition;
-    @apply placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100;
+  /* Glass effect */
+  .glass {
+    @apply border border-white/20 bg-white/80 backdrop-blur-xl;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }

@@ -1,20 +1,16 @@
-import { put, del, head } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 
 export const storageService = {
-  async save(path: string, body: Buffer | Blob, contentType: string) {
-    const blob = await put(path, body, {
+  async upload(path: string, file: Buffer | Blob, contentType: string) {
+    const blob = await put(path, file, {
       contentType,
-      addRandomSuffix: false,
       access: "public",
+      addRandomSuffix: false,
     });
     return blob.url;
   },
 
-  async head(path: string) {
-    return await head(path);
-  },
-
-  async remove(path: string) {
-    await del(path);
+  async remove(url: string) {
+    await del(url);
   },
 };

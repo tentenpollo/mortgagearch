@@ -1,41 +1,54 @@
 import {
   pgTable,
-  index,
   uuid,
   varchar,
   text,
   timestamp,
   integer,
-  boolean,
   jsonb,
   bigint,
-  real,
-  inet,
+  index,
 } from "drizzle-orm/pg-core";
 
-// ============================================================
-// Clients
-// ============================================================
+// ──────────────────────────────────────────────────────────────
+// Broker Profiles (linked to Supabase auth.users)
+// ──────────────────────────────────────────────────────────────
+
+export const brokerProfiles = pgTable("broker_profiles", {
+  id: uuid("id").primaryKey(), // = auth.users.id
+  fullName: varchar("full_name", { length: 200 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ──────────────────────────────────────────────────────────────
+// Clients (borrowers managed by brokers)
+// ──────────────────────────────────────────────────────────────
 
 export const clients = pgTable(
   "clients",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    brokerId: uuid("broker_id")
+      .references(() => brokerProfiles.id)
+      .notNull(),
     name: varchar("name", { length: 200 }).notNull(),
-    email: varchar("email", { length: 255 }).notNull().unique(),
+    email: varchar("email", { length: 255 }).notNull(),
     phone: varchar("phone", { length: 30 }),
-    folderPath: varchar("folder_path", { length: 500 }).notNull(),
+    notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
+    brokerIdIdx: index("clients_broker_id_idx").on(table.brokerId),
     createdAtIdx: index("clients_created_at_idx").on(table.createdAt),
   })
 );
 
-// ============================================================
-// Upload Tokens
-// ============================================================
+// ──────────────────────────────────────────────────────────────
+// Upload Tokens (secure links for borrower uploads)
+// ──────────────────────────────────────────────────────────────
 
 export const uploadTokens = pgTable(
   "upload_tokens",
@@ -45,7 +58,10 @@ export const uploadTokens = pgTable(
     clientId: uuid("client_id")
       .references(() => clients.id)
       .notNull(),
-    reason: varchar("reason", { length: 500 }),
+    brokerId: uuid("broker_id")
+      .references(() => brokerProfiles.id)
+      .notNull(),
+    label: varchar("label", { length: 500 }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     maxUploads: integer("max_uploads"),
     uploadCount: integer("upload_count").default(0).notNull(),
@@ -54,13 +70,13 @@ export const uploadTokens = pgTable(
   },
   (table) => ({
     clientIdIdx: index("upload_tokens_client_id_idx").on(table.clientId),
-    clientIdCreatedAtIdx: index("upload_tokens_client_id_created_at_idx").on(table.clientId, table.createdAt),
+    tokenIdx: index("upload_tokens_token_idx").on(table.token),
   })
 );
 
-// ============================================================
+// ──────────────────────────────────────────────────────────────
 // Documents
-// ============================================================
+// ──────────────────────────────────────────────────────────────
 
 export const documents = pgTable(
   "documents",
@@ -70,67 +86,48 @@ export const documents = pgTable(
       .references(() => clients.id)
       .notNull(),
     uploadTokenId: uuid("upload_token_id").references(() => uploadTokens.id),
-
-  // File info
-  originalFilename: varchar("original_filename", { length: 500 }).notNull(),
-  mimeType: varchar("mime_type", { length: 100 }).notNull(),
-  fileSizeBytes: bigint("file_size_bytes", { mode: "number" }).notNull(),
-  sha256: varchar("sha256", { length: 64 }),
-  storedPath: varchar("stored_path", { length: 1000 }).notNull(),
-
-  // Pipeline state
-  status: varchar("status", { length: 30 }).notNull().default("UPLOADED"),
-  statusReason: text("status_reason"),
-  ocrAttempts: integer("ocr_attempts").default(0).notNull(),
-  aiAttempts: integer("ai_attempts").default(0).notNull(),
-
-  // OCR results
-  ocrTextPath: varchar("ocr_text_path", { length: 1000 }),
-  ocrConfidence: real("ocr_confidence"),
-  ocrMetadata: jsonb("ocr_metadata"),
-  ocrCompletedAt: timestamp("ocr_completed_at", { withTimezone: true }),
-
-  // AI results
-  aiProvider: varchar("ai_provider", { length: 30 }),
-  aiModel: varchar("ai_model", { length: 50 }),
-  aiResult: jsonb("ai_result"), // normalized AiResult shape
-  aiRawResponse: jsonb("ai_raw_response"),
-  aiCompletedAt: timestamp("ai_completed_at", { withTimezone: true }),
-
-  // Broker review
-  reviewedBy: varchar("reviewed_by", { length: 100 }),
-  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-  reviewDecision: varchar("review_decision", { length: 20 }),
-  reviewNotes: text("review_notes"),
-  brokerCorrections: jsonb("broker_corrections"),
-
-  // Filing
-  finalFilename: varchar("final_filename", { length: 500 }),
-  finalPath: varchar("final_path", { length: 1000 }),
-  filedAt: timestamp("filed_at", { withTimezone: true }),
-
+    originalFilename: varchar("original_filename", { length: 500 }).notNull(),
+    mimeType: varchar("mime_type", { length: 100 }).notNull(),
+    fileSizeBytes: bigint("file_size_bytes", { mode: "number" }).notNull(),
+    storedUrl: varchar("stored_url", { length: 1000 }).notNull(),
+    // Pipeline status
+    status: varchar("status", { length: 30 }).notNull().default("UPLOADED"),
+    statusReason: text("status_reason"),
+    // Broker review
+    reviewedBy: uuid("reviewed_by"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewDecision: varchar("review_decision", { length: 20 }),
+    reviewNotes: text("review_notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
+    clientIdIdx: index("documents_client_id_idx").on(table.clientId),
+    statusIdx: index("documents_status_idx").on(table.status),
     uploadTokenIdIdx: index("documents_upload_token_id_idx").on(table.uploadTokenId),
   })
 );
 
-// ============================================================
-// Audit Logs (append-only — no updated_at column)
-// ============================================================
+// ──────────────────────────────────────────────────────────────
+// Audit Logs (append-only, immutable)
+// ──────────────────────────────────────────────────────────────
 
-export const auditLogs = pgTable("audit_logs", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  documentId: uuid("document_id").references(() => documents.id),
-  clientId: uuid("client_id").references(() => clients.id),
-  actorType: varchar("actor_type", { length: 20 }).notNull(), // SYSTEM | BROKER | CLIENT | AI
-  actorId: varchar("actor_id", { length: 100 }),
-  action: varchar("action", { length: 50 }).notNull(),
-  details: jsonb("details"),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  // NO updated_at — audit logs are immutable
-});
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    brokerId: uuid("broker_id"),
+    clientId: uuid("client_id"),
+    documentId: uuid("document_id"),
+    actorType: varchar("actor_type", { length: 20 }).notNull(), // SYSTEM | BROKER | BORROWER
+    actorId: varchar("actor_id", { length: 100 }),
+    action: varchar("action", { length: 50 }).notNull(),
+    details: jsonb("details"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    brokerIdIdx: index("audit_logs_broker_id_idx").on(table.brokerId),
+    createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
+  })
+);
